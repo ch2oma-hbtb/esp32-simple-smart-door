@@ -49,7 +49,7 @@ bool pairingButtonPressed = false;
 
 // Forward declarations
 bool isDevicePaired(String macAddress);
-void addPairedDevice(String macAddress);
+bool addPairedDevice(String macAddress);
 
 // BLE scan callback class
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
@@ -73,11 +73,13 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 
     // Add new device if not already paired
     if (!isDevicePaired(devMac)) {
-      addPairedDevice(devMac);
-      Serial.print("[PAIR] ✓ Device paired: ");
-      Serial.print(devName);
-      Serial.print(" | MAC: ");
-      Serial.println(devMac);
+      bool success = addPairedDevice(devMac);
+      if (success) {
+        Serial.print("[PAIR] ✓ Device paired: ");
+        Serial.print(devName);
+        Serial.print(" | MAC: ");
+        Serial.println(devMac);
+      }
     } else {
       Serial.println("[PAIR] Device already paired.");
     }
@@ -292,19 +294,20 @@ bool isDevicePaired(String macAddress) {
   return false;
 }
 
-void addPairedDevice(String macAddress) {
+bool addPairedDevice(String macAddress) {
   if (pairedDeviceCount >= MAX_PAIRED_DEVICES) {
     Serial.println("[PAIR] ERROR: Maximum paired devices reached!");
-    return;
+    return false;
   }
   
   if (isDevicePaired(macAddress)) {
-    return; // Already paired
+    return false; // Already paired
   }
   
   pairedDevices[pairedDeviceCount] = macAddress;
   pairedDeviceCount++;
   savePairedDevices();
+  return true;
 }
 
 void loadPairedDevices() {
