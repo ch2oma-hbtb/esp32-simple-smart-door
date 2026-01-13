@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ESP32Servo.h>
 
 // --- Configuration ---
 const char* ssid = "Pond2";
@@ -8,16 +9,18 @@ const char* password = "84383972Aa";
 
 // Hardware Pin Definitions for Seeed Studio XIAO ESP32-C3
 // Note: D0=GPIO2, D1=GPIO3, D10=GPIO10, etc.
-#define PIN_LOCK_RELAY  3   // D1 (GPIO 3) - Connect Relay Here
-#define PIN_STATUS_LED  2   // D0 (GPIO 2) - Connect LED Here (XIAO C3 has no user LED on typical pins, use external)
-#define PIN_OPEN_BUTTON 9   // Boot Button on XIAO ESP32-C3 is GPIO 9
+#define PIN_SERVO       D1   // Connect Servo Signal Here
+#define PIN_STATUS_LED  D2   // Connect LED Here (XIAO C3 has no user LED on typical pins, use external)
+#define PIN_OPEN_BUTTON D8   // Boot Button on XIAO ESP32-C3
 
 // Lock Settings
-#define LOCK_OPEN_DURATION_MS 3000 // How long the lock stays open in ms
-#define RELAY_ACTIVE_HIGH true     // Set to false if relay is active low
+#define LOCK_OPEN_DURATION_MS 15000 // How long the lock stays open in ms
+#define SERVO_LOCKED_ANGLE   0     // Servo angle when locked (degrees)
+#define SERVO_UNLOCKED_ANGLE 150    // Servo angle when unlocked (degrees)
 
 // --- Global Variables ---
 WebServer server(80);
+Servo doorServo;
 unsigned long unlockTime = 0;
 bool isLocked = true;
 
@@ -32,14 +35,16 @@ void setupWiFi();
 
 void toggleLock(bool locked) {
     isLocked = locked;
-    // Control Relay
-    bool pinState = locked ? !RELAY_ACTIVE_HIGH : RELAY_ACTIVE_HIGH;
-    digitalWrite(PIN_LOCK_RELAY, pinState);
+    // Control Servo
+    int servoAngle = locked ? SERVO_LOCKED_ANGLE : SERVO_UNLOCKED_ANGLE;
+    doorServo.write(servoAngle);
     
     // Control LED (LED on when unlocked for visibility)
     digitalWrite(PIN_STATUS_LED, !locked ? HIGH : LOW);
     
-    Serial.println(locked ? "Door LOCKED" : "Door UNLOCKED");
+    Serial.print(locked ? "Door LOCKED" : "Door UNLOCKED");
+    Serial.print(" - Servo angle: ");
+    Serial.println(servoAngle);
 }
 
 void setupWiFi() {
@@ -111,7 +116,7 @@ void setup() {
     Serial.begin(115200);
     
     // Setup Pins
-    pinMode(PIN_LOCK_RELAY, OUTPUT);
+    doorServo.attach(PIN_SERVO);  // Attach servo to pin
     pinMode(PIN_STATUS_LED, OUTPUT);
     pinMode(PIN_OPEN_BUTTON, INPUT_PULLUP); // Assuming button pulled to ground when pressed
     
