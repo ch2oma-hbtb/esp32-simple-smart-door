@@ -12,8 +12,8 @@
 #define AP_SSID "SmartLock-Setup"
 #define AP_PASSWORD "12345678" // Minimum 8 characters for WPA2
 #define DEFAULT_RSSI_THRESHOLD -70
-#define BLE_SCAN_INTERVAL 100  // Short pause between scans (100ms)
-#define BLE_SCAN_DURATION 3000 // Scan for 3 seconds
+#define BLE_SCAN_INTERVAL 800  // Pause between scans (800ms)
+#define BLE_SCAN_DURATION 400  // Scan for 400ms
 
 // Hardware Pin Definitions for Seeed Studio XIAO ESP32-C3
 // Note: D0=GPIO2, D1=GPIO3, D10=GPIO10, etc.
@@ -747,5 +747,8 @@ void loop() {
         delay(10);
       } // Wait for release
     }
+  
+  // Small delay to allow CPU to idle/handle background tasks
+  delay(10); 
   }
 }
