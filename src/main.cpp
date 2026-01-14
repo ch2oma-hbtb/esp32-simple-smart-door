@@ -75,14 +75,63 @@ void saveBLESettings();
 void loadServoSettings();
 void saveServoSettings();
 void periodicBLEScan();
+void sendRedirect(String location);
+String getPageHeader(String title, String extraHead = "");
+void moveServo(int angle);
 
 // --- Implementation ---
+
+void moveServo(int angle) {
+  doorServo.attach(PIN_SERVO);
+  doorServo.write(angle);
+  delay(3000); // Wait for servo to reach position
+  doorServo.detach(); // Detach to eliminate idle current
+}
+
+void sendRedirect(String location) {
+  server.sendHeader("Location", location);
+  server.send(303);
+}
+
+String getPageHeader(String title, String extraHead) {
+  String html = "<!DOCTYPE html><html><head>";
+  html += "<title>" + title + "</title>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += extraHead;
+  html += "<style>";
+  // Common CSS
+  html += "body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; text-align: center; }";
+  html += "input { padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }";
+  html += ".button { background-color: #4CAF50; border: none; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 4px 2px; cursor: pointer; border-radius: 4px; }";
+  
+  // Helpers
+  html += ".w-100 { width: 100%; }"; 
+  html += ".reset { background-color: #f44336; font-size: 12px; }";
+  html += ".remove { background-color: #dc3545; font-size: 12px; padding: 5px 10px; }";
+  html += ".secondary { background-color: #6c757d; }";
+  html += ".primary { background-color: #007bff; }";
+  html += ".orange { background-color: #FF9800; }";
+  
+  html += ".status { font-size: 24px; margin-bottom: 20px; font-weight: bold; }";
+  html += ".info { font-size: 12px; color: #666; margin-top: 30px; }";
+  
+  // List items
+  html += "ul { list-style-type: none; padding: 0; }";
+  html += "li { padding: 10px; background: #f8f9fa; margin: 5px 0; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; text-align: left; }"; 
+  
+  html += "form.card { display: inline-block; text-align: left; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #eee; }";
+  html += "h1, h3 { color: #333; }";
+  html += "</style></head><body>";
+  return html;
+}
 
 void toggleLock(bool locked) {
   isLocked = locked;
   // Control Servo
   int servoAngle = locked ? servoLockedAngle : servoUnlockedAngle;
-  doorServo.write(servoAngle);
+  
+  // Attach servo, move it, then detach to save power
+  moveServo(servoAngle);
 
   // Control LED (LED on when unlocked for visibility)
   digitalWrite(PIN_STATUS_LED, !locked ? HIGH : LOW);
@@ -164,52 +213,23 @@ void startAPMode() {
 void handleRoot() {
   if (isAPMode) {
     // Show WiFi setup page in AP mode
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<title>SmartLock WiFi Setup</title>";
-    html +=
-        "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-    html += "<style>";
-    html += "body { font-family: sans-serif; max-width: 400px; margin: 50px "
-            "auto; padding: 20px; }";
-    html += "input { width: 100%; padding: 12px; margin: 8px 0; box-sizing: "
-            "border-box; }";
-    html += ".button { background-color: #4CAF50; border: none; color: white; "
-            "padding: 16px; ";
-    html += "width: 100%; text-align: center; font-size: 16px; cursor: "
-            "pointer; border-radius: 4px; margin-top: 10px;}";
-    html += "h1 { color: #333; }";
-    html += "</style></head><body>";
+    String html = getPageHeader("SmartLock WiFi Setup");
     html += "<h1>SmartLock Setup</h1>";
     html += "<p>Enter your WiFi credentials:</p>";
     html += "<form action='/savewifi' method='POST'>";
     html += "<label>WiFi Network:</label>";
-    html += "<input type='text' name='ssid' placeholder='WiFi Name' required>";
+    html += "<input type='text' name='ssid' class='w-100' placeholder='WiFi Name' required>";
     html += "<label>Password:</label>";
-    html += "<input type='password' name='password' placeholder='WiFi "
+    html += "<input type='password' name='password' class='w-100' placeholder='WiFi "
             "Password' required>";
-    html += "<button class='button' type='submit'>Save & Connect</button>";
+    html += "<button class='button w-100' type='submit'>Save & Connect</button>";
     html += "</form>";
     html += "</body></html>";
     server.send(200, "text/html", html);
   } else {
     // Normal operation mode - show lock control
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<title>ESP32 Smart Lock</title>";
-    html +=
-        "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-    html += "<style>";
-    html += "body { font-family: sans-serif; text-align: center; margin-top: "
-            "50px; }";
-    html += ".button { background-color: #4CAF50; border: none; color: white; "
-            "padding: 16px 32px; ";
-    html += "text-align: center; text-decoration: none; display: inline-block; "
-            "font-size: 16px; margin: 4px 2px; cursor: pointer; border-radius: "
-            "4px;}";
-    html += ".reset { background-color: #f44336; padding: 8px 16px; font-size: "
-            "12px; }";
-    html += ".status { font-size: 24px; margin-bottom: 20px; }";
-    html += ".info { font-size: 12px; color: #666; margin-top: 30px; }";
-    html += "</style></head><body>";
+
+    String html = getPageHeader("ESP32 Smart Lock");
 
     html += "<h1>Control Panel</h1>";
     html += "<div class='status'>Status: " +
@@ -219,16 +239,13 @@ void handleRoot() {
       html +=
           "<a href='/unlock'><button class='button'>UNLOCK DOOR</button></a>";
     } else {
-      html += "<a href='/lock'><button class='button' "
-              "style='background-color:#FF9800'>LOCK DOOR</button></a>";
+      html += "<a href='/lock'><button class='button orange'>LOCK DOOR</button></a>";
     }
 
     html += "<div class='info'>Connected to: " + savedSSID + "<br>";
     html += "IP: " + WiFi.localIP().toString() + "<br>";
     html += "<h3>Servo Configuration</h3>";
-    html += "<form action='/updateservo' method='POST' style='display: "
-            "inline-block; text-align: left; background: #f9f9f9; padding: "
-            "20px; border-radius: 8px; border: 1px solid #eee;'>";
+    html += "<form action='/updateservo' method='POST' class='card'>";
     html += "<div style='margin-bottom: 15px;'>";
     html += "<label style='display: inline-block; width: 140px;'>Locked "
             "Angle:</label>";
@@ -248,8 +265,7 @@ void handleRoot() {
             "font-size: 14px; margin-top: 5px;'>Update Angles</button>";
     html += "</div>";
     html += "</form><br><br>";
-    html += "<a href='/blesettings'><button class='button' "
-            "style='background-color:#007bff'>BLE Settings</button></a><br>";
+    html += "<a href='/blesettings'><button class='button primary'>BLE Settings</button></a><br>";
     html += "<a href='/reset'><button class='button reset'>Reset WiFi "
             "Settings</button></a>";
     html += "</div>";
@@ -263,16 +279,14 @@ void handleUnlock() {
     toggleLock(false); // Unlock
     unlockTime = millis();
   }
-  server.sendHeader("Location", "/");
-  server.send(303);
+  sendRedirect("/");
 }
 
 void handleLock() {
   if (!isAPMode) {
     toggleLock(true); // Lock
   }
-  server.sendHeader("Location", "/");
-  server.send(303);
+  sendRedirect("/");
 }
 
 void handleSaveWiFi() {
@@ -291,11 +305,7 @@ void handleSaveWiFi() {
     preferences.putString("password", newPassword);
     preferences.end();
 
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<meta http-equiv='refresh' content='10;url=/'>";
-    html += "<style>body { font-family: sans-serif; text-align: center; "
-            "margin-top: 50px; }</style>";
-    html += "</head><body>";
+    String html = getPageHeader("Settings Saved!", "<meta http-equiv='refresh' content='10;url=/'>");
     html += "<h1>Settings Saved!</h1>";
     html += "<p>Connecting to: " + newSSID + "</p>";
     html += "<p>Device will restart in 10 seconds...</p>";
@@ -312,11 +322,7 @@ void handleSaveWiFi() {
 }
 
 void handleReset() {
-  String html = "<!DOCTYPE html><html><head>";
-  html += "<meta http-equiv='refresh' content='5;url=/'>";
-  html += "<style>body { font-family: sans-serif; text-align: center; "
-          "margin-top: 50px; }</style>";
-  html += "</head><body>";
+  String html = getPageHeader("Resetting WiFi Settings", "<meta http-equiv='refresh' content='5;url=/'>");
   html += "<h1>Resetting WiFi Settings</h1>";
   html += "<p>Device will restart in AP mode...</p>";
   html += "<p>Connect to: " + String(AP_SSID) + "</p>";
@@ -382,27 +388,10 @@ void handleBLESettings() {
     return;
   }
 
-  String html = "<!DOCTYPE html><html><head>";
-  html += "<title>BLE Settings</title>";
-  html +=
-      "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-  html += "<style>";
-  html += "body { font-family: sans-serif; max-width: 600px; margin: 20px "
-          "auto; padding: 20px; }";
-  html += ".button { background-color: #007bff; border: none; color: white; "
-          "padding: 10px 20px; text-decoration: none; border-radius: 4px; "
-          "cursor: pointer; }";
-  html += ".remove { background-color: #dc3545; font-size: 12px; padding: 5px "
-          "10px; margin-left: 10px;}";
-  html += "ul { list-style-type: none; padding: 0; }";
-  html += "li { padding: 10px; background: #f8f9fa; margin: 5px 0; border: 1px "
-          "solid #ddd; display: flex; justify-content: space-between; "
-          "align-items: center;}";
-  html += "</style></head><body>";
+  String html = getPageHeader("BLE Settings");
 
   html += "<h1>BLE Configuration</h1>";
-  html += "<a href='/'><button class='button' "
-          "style='background-color:#6c757d'>&larr; Back</button></a>";
+  html += "<a href='/'><button class='button secondary'>&larr; Back</button></a>";
 
   html += "<h3>RSSI Threshold: " + String(rssiThreshold) + " dBm</h3>";
   html += "<form action='/setrssi' method='GET'>";
@@ -419,7 +408,7 @@ void handleBLESettings() {
   html += "</ul>";
 
   html += "<h3>Scan New Devices</h3>";
-  html += "<a href='/blescan'><button class='button'>Scan Nearby "
+  html += "<a href='/blescan'><button class='button primary'>Scan Nearby "
           "Devices</button></a>";
 
   html += "</body></html>";
@@ -474,14 +463,7 @@ void handleBLEScan() {
               return a.rssi > b.rssi;
             });
 
-  String html = "<!DOCTYPE html><html><head>";
-  html += "<title>Scan Results</title>";
-  html +=
-      "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-  html += "<style>body { font-family: sans-serif; padding: 20px; } ul { "
-          "list-style: none; padding: 0; } li { margin: 10px 0; border-bottom: "
-          "1px solid #eee; padding: 10px; }</style>";
-  html += "</head><body>";
+  String html = getPageHeader("Scan Results", "<style>li { display: block; }</style>");
   html += "<h1>Found Devices</h1>";
   html += "<a href='/blesettings'>Back to Settings</a>";
   html += "<ul>";
@@ -523,8 +505,7 @@ void handleAuthorize() {
       saveBLESettings();
     }
   }
-  server.sendHeader("Location", "/blesettings");
-  server.send(303);
+  sendRedirect("/blesettings");
 }
 
 void handleDeauthorize() {
@@ -538,8 +519,7 @@ void handleDeauthorize() {
     }
     saveBLESettings();
   }
-  server.sendHeader("Location", "/blesettings");
-  server.send(303);
+  sendRedirect("/blesettings");
 }
 
 void handleSetRSSI() {
@@ -548,8 +528,7 @@ void handleSetRSSI() {
     rssiThreshold = val.toInt();
     saveBLESettings();
   }
-  server.sendHeader("Location", "/blesettings");
-  server.send(303);
+  sendRedirect("/blesettings");
 }
 
 void handleUpdateServo() {
@@ -569,10 +548,9 @@ void handleUpdateServo() {
   saveServoSettings();
 
   // Refresh servo position to reflect updated angle immediately
-  doorServo.write(isLocked ? servoLockedAngle : servoUnlockedAngle);
+  moveServo(isLocked ? servoLockedAngle : servoUnlockedAngle);
 
-  server.sendHeader("Location", "/");
-  server.send(303);
+  sendRedirect("/");
 }
 
 void periodicBLEScan() {
@@ -657,7 +635,7 @@ void setup() {
   Serial.begin(115200);
 
   // Setup Pins
-  doorServo.attach(PIN_SERVO); // Attach servo to pin
+  // Note: Servo is now attached/detached in toggleLock() to save power
   pinMode(PIN_STATUS_LED, OUTPUT);
   pinMode(PIN_OPEN_BUTTON,
           INPUT_PULLUP); // Assuming button pulled to ground when pressed
